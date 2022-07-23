@@ -15,3 +15,6 @@ htmlcov
 tests/build
 tests/cache
 .pytest_cache/
+
+# local virtual environment
+.venv
