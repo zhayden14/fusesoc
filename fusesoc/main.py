@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import warnings
+from pathlib import Path
 
 from fusesoc import __version__
 
@@ -99,11 +100,11 @@ def add_library(cm, args):
     sync_uri = vars(args)["sync-uri"]
 
     if args.location:
-        location = args.location
+        location = Path(args.location)
     elif vars(args).get("global", False):
-        location = os.path.join(cm._lm.library_root, args.name)
+        location = Path(cm._lm.library_root) / args.name
     else:
-        location = os.path.join("fusesoc_libraries", args.name)
+        location = Path("fusesoc_libraries") / args.name
 
     if "sync-type" in vars(args):
         sync_type = vars(args)["sync-type"]
@@ -125,6 +126,7 @@ def add_library(cm, args):
         )
         location = os.path.abspath(sync_uri)
 
+    location = Path(location).resolve()
     auto_sync = not args.no_auto_sync
     library = Library(args.name, location, sync_type, sync_uri, auto_sync)
 
