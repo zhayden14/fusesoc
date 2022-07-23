@@ -4,6 +4,7 @@
 
 import os.path
 import warnings
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -65,7 +66,7 @@ def test_capi2_export():
     core_file = os.path.join(tests_dir, "capi2_cores", "misc", "files.core")
     core = Core(core_file)
 
-    export_root = tempfile.mkdtemp(prefix="capi2_export_")
+    export_root = Path(tempfile.mkdtemp(prefix="capi2_export_"))
 
     core.export(export_root)
 
@@ -78,10 +79,8 @@ def test_capi2_export():
         "vlogfile",
         "vpifile",
     ]
-    result = []
-
-    for root, dirs, files in os.walk(export_root):
-        result += [os.path.relpath(os.path.join(root, f), export_root) for f in files]
+    expected = [export_root / f for f in expected]
+    result = [p for p in list(Path(export_root).glob("**/*")) if p.is_file()]
 
     assert expected == sorted(result)
 
@@ -91,12 +90,11 @@ def test_capi2_export():
 
     core.files_root = os.path.join(tests_dir, __name__)
     core.export(export_root, {"target": "files_root_test", "is_toplevel": True})
-    expected = ["targets.info"]
+    expected = [export_root / "targets.info"]
 
     result = []
 
-    for root, dirs, files in os.walk(export_root):
-        result += [os.path.relpath(os.path.join(root, f), export_root) for f in files]
+    result = [p for p in list(Path(export_root).glob("**/*")) if p.is_file()]
     assert expected == sorted(result)
 
 
