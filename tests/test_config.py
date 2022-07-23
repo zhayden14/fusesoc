@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import os.path
+from pathlib import Path
 import tempfile
+import pytest
 
 from test_common import cache_root, cores_root, library_root
 
@@ -26,8 +28,9 @@ sync-uri = https://github.com/fusesoc/fusesoc-cores
 
 
 def test_config_file():
-    tcf = tempfile.TemporaryFile(mode="w+")
-    tcf.write(
+    tcd = tempfile.TemporaryDirectory()
+    tcf = Path(tcd.name) / "fusesoc.conf"
+    tcf.write_text(
         EXAMPLE_CONFIG.format(
             build_root=build_root,
             cache_root=cache_root,
@@ -35,16 +38,16 @@ def test_config_file():
             library_root=library_root,
         )
     )
-    tcf.seek(0)
 
     conf = Config(file=tcf)
 
-    assert conf.build_root == build_root
+    assert conf.build_root == Path(build_root)
 
 
 def test_config_path():
-    tcf = tempfile.NamedTemporaryFile(mode="w+")
-    tcf.write(
+    tcd = tempfile.TemporaryDirectory()
+    tcf = Path(tcd.name) / "fusesoc.conf"
+    tcf.write_text(
         EXAMPLE_CONFIG.format(
             build_root=build_root,
             cache_root=cache_root,
@@ -52,16 +55,16 @@ def test_config_path():
             library_root=library_root,
         )
     )
-    tcf.seek(0)
 
-    conf = Config(path=tcf.name)
+    conf = Config(path=tcf)
 
-    assert conf.library_root == library_root
+    assert conf.library_root == Path(library_root)
 
 
 def test_config_libraries():
-    tcf = tempfile.NamedTemporaryFile(mode="w+")
-    tcf.write(
+    tcd = tempfile.TemporaryDirectory()
+    tcf = Path(tcd.name) / "fusesoc.conf"
+    tcf.write_text(
         EXAMPLE_CONFIG.format(
             build_root=build_root,
             cache_root=cache_root,
@@ -69,9 +72,8 @@ def test_config_libraries():
             library_root=library_root,
         )
     )
-    tcf.seek(0)
 
-    conf = Config(path=tcf.name)
+    conf = Config(path=tcf)
 
     lib = None
     for library in conf.libraries:
@@ -79,6 +81,6 @@ def test_config_libraries():
             lib = library
     assert lib
 
-    assert lib.location == os.path.join(library_root, "test_lib")
+    assert Path(lib.location) == Path(library_root) / "test_lib"
     assert lib.sync_uri == "https://github.com/fusesoc/fusesoc-cores"
     assert not lib.auto_sync

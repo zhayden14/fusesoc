@@ -7,6 +7,8 @@ import logging
 import os
 import sys
 from configparser import ConfigParser as CP
+from pathlib import Path
+from typing import Optional
 
 from fusesoc.librarymanager import Library
 
@@ -14,7 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 class Config:
-    def __init__(self, path=None, file=None):
+    _path: Path
+    # build_root: Path
+    # cache_root: Path
+    # systems_root: Path
+    # library_root: Path
+    # libraries: List[Path]
+
+    def __init__(
+        self, path: Optional[os.PathLike] = None, file: Optional[os.PathLike] = None
+    ):
         self.build_root = None
         self.cache_root = None
         cores_root = []
@@ -25,37 +36,44 @@ class Config:
         config = CP()
         if file is None:
             if path is None:
-                xdg_config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
-                    os.path.expanduser("~"), ".config"
-                )
+                xdg_config_home = os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")
+                xdg_config_home = Path(xdg_config_home).expanduser().resolve()
                 config_files = [
-                    "/etc/fusesoc/fusesoc.conf",
-                    os.path.join(xdg_config_home, "fusesoc", "fusesoc.conf"),
-                    "fusesoc.conf",
+                    Path("/etc/fusesoc/fusesoc.conf"),
+                    xdg_config_home / "fusesoc/fusesoc.conf",
+                    Path("fusesoc.conf"),
                 ]
             else:
+                path = Path(path).resolve()
                 logger.debug(f"Using config file '{path}'")
-                if not os.path.isfile(path):
+                if not path.is_file():
                     with open(path, "a"):
                         pass
                 config_files = [path]
 
-            logger.debug("Looking for config files from " + ":".join(config_files))
+            logger.debug(
+                "Looking for config files from "
+                + ":".join([str(cf) for cf in config_files])
+            )
             files_read = config.read(config_files)
             logger.debug("Found config files in " + ":".join(files_read))
             if files_read:
-                self._path = files_read[-1]
+                self._path = Path(files_read[-1])
         else:
             logger.debug("Using supplied config file")
-            config.read_file(file)
-            file.seek(0)
-            self._path = file.name
+            file = Path(file)
+            config.read(file)
+            self._path = file
 
         for item in ["build_root", "cache_root", "systems_root", "library_root"]:
             try:
-                setattr(self, item, os.path.expanduser(config.get("main", item)))
+                setattr(
+                    self, item, Path(config.get("main", item)).expanduser().resolve()
+                )
                 if item == "systems_root":
-                    systems_root = [os.path.expanduser(config.get("main", item))]
+                    systems_root = [
+                        Path(config.get("main", item)).expanduser().resolve()
+                    ]
                     logger.warning(
                         "The systems_root option in fusesoc.conf is deprecated. Please migrate to libraries instead"
                     )
@@ -65,7 +83,9 @@ class Config:
                 pass
 
         try:
-            cores_root = config.get("main", "cores_root").split()
+            cores_root = config.get("main", "cores_root")
+            if cores_root:
+                cores_root = [cores_root]
             logger.warning(
                 "The cores_root option in fusesoc.conf is deprecated. Please migrate to libraries instead"
             )
@@ -76,22 +96,22 @@ class Config:
 
         # Set fallback values
         if self.build_root is None:
-            self.build_root = os.path.abspath("build")
+            self.build_root = Path("build").resolve()
         if self.cache_root is None:
-            xdg_cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(
-                os.path.expanduser("~"), ".cache"
-            )
-            self.cache_root = os.path.join(xdg_cache_home, "fusesoc")
-            os.makedirs(self.cache_root, exist_ok=True)
-        if not cores_root and os.path.exists("cores"):
-            cores_root = [os.path.abspath("cores")]
-        if (not systems_root) and os.path.exists("systems"):
-            systems_root = [os.path.abspath("systems")]
+            xdg_cache_home = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+            xdg_cache_home = Path(xdg_cache_home).expanduser().resolve()
+            self.cache_root = xdg_cache_home / "fusesoc"
+            self.cache_root.mkdir(exist_ok=True, parents=True)
+        if not cores_root and Path("cores").exists():
+            cores_root = [Path("cores").resolve()]
+        if (not systems_root) and Path("systems").exists():
+            systems_root = [Path("systems").resolve()]
         if self.library_root is None:
-            xdg_data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(
-                os.path.expanduser("~"), ".local/share"
+            xdg_data_home = (
+                os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share"
             )
-            self.library_root = os.path.join(xdg_data_home, "fusesoc")
+            xdg_data_home = Path(xdg_data_home).expanduser().resolve()
+            self.library_root = xdg_data_home / "fusesoc"
 
         # Parse library sections
         libraries = []
@@ -101,7 +121,7 @@ class Config:
             try:
                 location = config.get(section, "location")
             except configparser.NoOptionError:
-                location = os.path.join(self.library_root, name)
+                location = self.library_root / name
 
             try:
                 auto_sync = config.getboolean(section, "auto-sync")
@@ -129,14 +149,15 @@ class Config:
         if os.getenv("FUSESOC_CORES"):
             env_cores_root = os.getenv("FUSESOC_CORES").split(":")
             env_cores_root.reverse()
+        env_cores_root = [Path(d) for d in env_cores_root]
 
         for root in cores_root + systems_root + env_cores_root:
             self.libraries.append(Library(root, root))
 
         self.libraries += libraries
 
-        logger.debug("cache_root=" + self.cache_root)
-        logger.debug("library_root=" + self.library_root)
+        logger.debug(f"cache_root={self.cache_root}")
+        logger.debug(f"library_root={self.library_root}")
 
     def add_library(self, library):
         from fusesoc.provider import get_provider
