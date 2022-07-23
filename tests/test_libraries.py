@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 from argparse import Namespace
+from pathlib import Path
 
 from test_common import cache_root, cores_root, library_root
 
@@ -34,8 +35,9 @@ sync_uri = "https://github.com/fusesoc/fusesoc-cores"
 def test_library_location():
     from fusesoc.main import _get_core, init_coremanager
 
-    tcf = tempfile.TemporaryFile(mode="w+")
-    tcf.write(
+    tcd = tempfile.TemporaryDirectory()
+    tcf = Path(tcd.name) / "fusesoc.conf"
+    tcf.write_text(
         EXAMPLE_CONFIG.format(
             build_root=build_root,
             cache_root=cache_root,
@@ -46,7 +48,6 @@ def test_library_location():
             sync_type="git",
         )
     )
-    tcf.seek(0)
 
     conf = Config(file=tcf)
     cm = init_coremanager(conf, [])
@@ -62,38 +63,40 @@ def test_library_add(caplog):
     from fusesoc.librarymanager import LibraryManager
     from fusesoc.main import add_library
 
-    tcf = tempfile.NamedTemporaryFile(mode="w+")
-    clone_target = tempfile.mkdtemp(prefix="library_add_")
-    library_root = tempfile.mkdtemp(prefix="library_add_")
-    conf = Config(file=tcf)
-    conf.library_root = library_root
-    cm = CoreManager(conf)
-    args = Namespace()
+    with tempfile.TemporaryDirectory() as tcd:
+        tcf = Path(tcd) / "fusesoc.conf"
+        clone_target = tempfile.mkdtemp(prefix="library_add_")
+        library_root = tempfile.mkdtemp(prefix="library_add_")
+        conf = Config(file=tcf)
+        conf.library_root = library_root
+        cm = CoreManager(conf)
+        args = Namespace()
 
-    args.name = "fusesoc-cores"
-    args.location = clone_target
-    args.config = tcf
-    args.no_auto_sync = False
-    vars(args)["sync-uri"] = sync_uri
+        args.name = "fusesoc-cores"
+        args.location = clone_target
+        args.config = tcf
+        args.no_auto_sync = False
+        vars(args)["sync-uri"] = sync_uri
 
-    add_library(cm, args)
+        add_library(cm, args)
 
-    expected = """[library.fusesoc-cores]
+        expected = """[library.fusesoc-cores]
 location = {}
 sync-uri = https://github.com/fusesoc/fusesoc-cores
 sync-type = git
 auto-sync = true""".format(
-        os.path.abspath(clone_target)
-    )
+            os.path.abspath(clone_target)
+        )
 
-    tcf.seek(0)
-    result = tcf.read().strip()
+        result = tcf.read_text().strip()
 
-    assert expected == result
+        assert expected == result
 
-    tcf.close()
-
-    tcf = tempfile.NamedTemporaryFile(mode="w+")
+    # Will be changing working dir because we're about to clone a library
+    cwd = os.getcwd()
+    tcd = tempfile.TemporaryDirectory()
+    os.chdir(tcd.name)
+    tcf = Path(tcd.name) / "fusesoc.conf"
 
     args.config = tcf
     args.location = None
@@ -107,33 +110,33 @@ auto-sync = true"""
 
     add_library(cm, args)
 
-    tcf.seek(0)
-    result = tcf.read().strip()
+    result = tcf.read_text().strip()
 
-    assert expected == result
-    shutil.rmtree("fusesoc_libraries")
-    tcf.close()
+    # FIXME: Temporary fix for windows tests
+    assert expected == result.replace("\\", "/")
+    os.chdir(cwd)
 
-    tcf = tempfile.NamedTemporaryFile(mode="w+")
+    with tempfile.TemporaryDirectory() as tcd:
+        tcf = Path(tcd) / "fusesoc.conf"
 
-    args.config = tcf
-    vars(args)["sync-type"] = "local"
-    vars(args)["sync-uri"] = "tests/capi2_cores"
-    args.location = None
+        args.config = tcf
+        vars(args)["sync-type"] = "local"
+        vars(args)["sync-uri"] = "tests/capi2_cores"
+        args.location = None
 
-    with caplog.at_level(logging.INFO):
-        add_library(cm, args)
+        with caplog.at_level(logging.INFO):
+            add_library(cm, args)
 
-    assert (
-        "Interpreting sync-uri 'tests/capi2_cores' as location for local provider."
-        in caplog.text
-    )
+        assert (
+            "Interpreting sync-uri 'tests/capi2_cores' as location for local provider."
+            in caplog.text
+        )
 
 
 def test_library_update(caplog):
     from fusesoc.main import init_coremanager, init_logging, update
 
-    clone_target = tempfile.mkdtemp()
+    clone_target = Path(tempfile.mkdtemp())
 
     subprocess.call(["git", "clone", sync_uri, clone_target])
 
