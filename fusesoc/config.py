@@ -179,7 +179,8 @@ class Config:
 
         config.add_section(section_name)
 
-        config.set(section_name, "location", library.location)
+        # TODO: would it be wise to enforce a relative library path layout?
+        config.set(section_name, "location", str(library.location))
 
         if library.sync_type:
             config.set(section_name, "sync-uri", library.sync_uri)
