@@ -51,7 +51,7 @@ setup(
         "setuptools_scm; python_version>='3.7'",
     ],
     install_requires=[
-        "edalize>=0.3.3",
+        "edalize @ git+https://github.com/zhayden14/edalize.git#egg=edalize",
         "pyparsing",
         "pyyaml",
         "simplesat>=0.8.0",
