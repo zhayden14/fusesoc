@@ -109,13 +109,13 @@ class Config:
         # constructor and self._path will not be None.
         assert self._path is not None
 
-        # TODO: resolve() should make this absolute. do we need the check at all?
-        expanded = Path(path).expanduser().resolve()
+        expanded = Path(path).expanduser()
         if expanded.is_absolute():
-            return expanded
+            return expanded.resolve()
         else:
             cfg_file_dir = Path(self._path).parent
-            return cfg_file_dir / expanded
+            cfg_file = cfg_file_dir / expanded
+            return cfg_file.resolve()
 
     def _path_from_cfg(self, config, name):
         as_str = config.get("main", name, fallback=None)
