@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import logging
-import os
+from pathlib import Path
 
 from fusesoc.provider import get_provider
 
@@ -11,24 +11,27 @@ logger = logging.getLogger(__name__)
 
 
 class Library:
-    def __init__(self, name, location, sync_type=None, sync_uri=None, auto_sync=True):
-        if sync_type and not sync_type in ["local", "git"]:
+    def __init__(
+        self,
+        name: str,
+        location: Path,
+        sync_type: str = None,
+        sync_uri: str = None,
+        auto_sync: bool = True,
+    ):
+        if sync_type and sync_type not in ["local", "git"]:
             raise ValueError(
-                "Library {} ({}) Invalid sync-type '{}'".format(
-                    name, location, sync_type
-                )
+                f"Library {name} ({location}) Invalid sync-type '{sync_type}'"
             )
 
         if sync_type in ["git"]:
             if not sync_uri:
                 raise ValueError(
-                    "Library {} ({}) sync-uri must be set when using sync_type 'git'".format(
-                        name, location
-                    )
+                    f"Library {name} ({location}) sync-uri must be set when using sync_type 'git'"
                 )
 
         self.name = name
-        self.location = location
+        self.location = Path(location)
         self.sync_type = sync_type or "local"
         self.sync_uri = sync_uri
         self.auto_sync = auto_sync
@@ -42,7 +45,7 @@ class Library:
             return
 
         # FIXME: Do an initial checkout if missing
-        if not os.path.exists(self.location):
+        if not self.location.exists():
             logger.warning(l(f"{self.location} does not exist. Ignoring update"))
             return
 

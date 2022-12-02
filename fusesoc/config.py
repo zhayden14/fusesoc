@@ -6,6 +6,8 @@ import configparser
 import logging
 import os
 from configparser import ConfigParser as CP
+from pathlib import Path
+from typing import Optional
 
 from fusesoc.librarymanager import Library
 
@@ -13,26 +15,35 @@ logger = logging.getLogger(__name__)
 
 
 class Config:
+    _path: Path
+    # build_root: Path
+    # cache_root: Path
+    # systems_root: Path
+    # library_root: Path
+    # libraries: List[Path]
     def __init__(self, path=None):
         config = CP()
 
         if path is None:
-            xdg_config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
-                os.path.expanduser("~"), ".config"
-            )
+            xdg_config_home = os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")
+            xdg_config_home = Path(xdg_config_home).expanduser().resolve()
             config_files = [
-                "/etc/fusesoc/fusesoc.conf",
-                os.path.join(xdg_config_home, "fusesoc", "fusesoc.conf"),
-                "fusesoc.conf",
+                Path("/etc/fusesoc/fusesoc.conf"),
+                xdg_config_home / "fusesoc/fusesoc.conf",
+                Path("fusesoc.conf"),
             ]
         else:
+            path = Path(path).resolve()
             logger.debug(f"Using config file '{path}'")
-            if not os.path.isfile(path):
+            if not path.is_file():
                 with open(path, "a"):
                     pass
             config_files = [path]
 
-        logger.debug("Looking for config files from " + ":".join(config_files))
+        logger.debug(
+            "Looking for config files from "
+            + ":".join([str(cf) for cf in config_files])
+        )
         files_read = config.read(config_files)
         logger.debug("Found config files in " + ":".join(files_read))
         self._path = files_read[-1] if files_read else None
@@ -54,7 +65,7 @@ class Config:
             try:
                 location = config.get(section, "location")
             except configparser.NoOptionError:
-                location = os.path.join(self.library_root, name)
+                location = self.library_root / name
 
             try:
                 auto_sync = config.getboolean(section, "auto-sync")
@@ -82,13 +93,14 @@ class Config:
         if os.getenv("FUSESOC_CORES"):
             env_cores_root = os.getenv("FUSESOC_CORES").split(":")
             env_cores_root.reverse()
+        env_cores_root = [Path(d) for d in env_cores_root]
 
         all_core_roots = cores_root + systems_root + env_cores_root
 
         self.libraries = [Library(root, root) for root in all_core_roots] + libraries
 
-        logger.debug("cache_root=" + self.cache_root)
-        logger.debug("library_root=" + self.library_root)
+        logger.debug(f"cache_root={self.cache_root}")
+        logger.debug(f"library_root={self.library_root}")
 
     def _resolve_path_from_cfg(self, path):
         # We only call resolve_path_from_cfg if config.get(...) returned
@@ -97,12 +109,13 @@ class Config:
         # constructor and self._path will not be None.
         assert self._path is not None
 
-        expanded = os.path.expanduser(path)
-        if os.path.isabs(expanded):
+        # TODO: resolve() should make this absolute. do we need the check at all?
+        expanded = Path(path).expanduser().resolve()
+        if expanded.is_absolute():
             return expanded
         else:
-            cfg_file_dir = os.path.dirname(self._path)
-            return os.path.join(cfg_file_dir, expanded)
+            cfg_file_dir = self._path.parent
+            return cfg_file_dir / expanded
 
     def _path_from_cfg(self, config, name):
         as_str = config.get("main", name, fallback=None)
@@ -117,17 +130,16 @@ class Config:
         if from_cfg is not None:
             return from_cfg
 
-        return os.path.abspath("build")
+        return Path("build").resolve()
 
     def _get_cache_root(self, config):
         from_cfg = self._path_from_cfg(config, "cache_root")
         if from_cfg is not None:
             return from_cfg
 
-        xdg_cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.join(
-            os.path.expanduser("~"), ".cache"
-        )
-        return os.path.join(xdg_cache_home, "fusesoc")
+        xdg_cache_home = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+        xdg_cache_home = Path(xdg_cache_home).expanduser().resolve()
+        return xdg_cache_home / "fusesoc"
 
     def _get_cores_root(self, config):
         from_cfg = self._paths_from_cfg(config, "cores_root")
@@ -138,7 +150,8 @@ class Config:
             )
             return from_cfg
 
-        return [os.path.abspath("cores")] if os.path.exists("cores") else []
+        core_path = Path("cores").expanduser().resolve()
+        return [core_path] if core_path.exists() else []
 
     def _get_systems_root(self, config):
         from_cfg = self._paths_from_cfg(config, "systems_root")
@@ -149,17 +162,17 @@ class Config:
             )
             return from_cfg
 
-        return [os.path.abspath("systems")] if os.path.exists("systems") else []
+        systems_path = Path("systems").expanduser().resolve()
+        return [systems_path] if systems_path.exists() else []
 
     def _get_library_root(self, config):
         from_cfg = self._path_from_cfg(config, "library_root")
         if from_cfg is not None:
             return from_cfg
 
-        xdg_data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(
-            os.path.expanduser("~"), ".local/share"
-        )
-        return os.path.join(xdg_data_home, "fusesoc")
+        xdg_data_home = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share"
+        xdg_data_home = Path(xdg_data_home).expanduser().resolve()
+        return xdg_data_home / "fusesoc"
 
     def _get_ignored_dirs(self, config):
         return self._paths_from_cfg(config, "ignored_dirs")
@@ -184,7 +197,8 @@ class Config:
 
         config.add_section(section_name)
 
-        config.set(section_name, "location", library.location)
+        # TODO: would it be wise to enforce a relative library path layout?
+        config.set(section_name, "location", str(library.location))
 
         if library.sync_type:
             config.set(section_name, "sync-uri", library.sync_uri)

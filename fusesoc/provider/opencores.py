@@ -24,12 +24,16 @@ class Opencores(Provider):
             logger.debug("Using cygpath translation")
             local_dir = cygpath(local_dir)
 
+        # FIXME: Added --non-interactive --trust-server-cert so tests can pass on new machines.
+        #        This is probably a bad move long-term. Need HowTo about authorizing repos.
         Launcher(
             "svn",
             [
                 "co",
                 "-q",
                 "--no-auth-cache",
+                "--non-interactive",
+                "--trust-server-cert",
                 "-r",
                 revision_number,
                 "--username",
