@@ -171,7 +171,7 @@ class Edalizer:
                 files_root = self.export_root / core.sanitized_name
                 core.export(files_root, _flags)
             else:
-                files_root = core.files_root
+                files_root = Path(core.files_root)
 
             rel_root = files_root / self.work_root
 
@@ -499,7 +499,7 @@ class Ttptttg:
         self.vlnv = Vlnv(vlnv_str)
 
         self.generator_input = {
-            "files_root": Path(core.files_root).expanduser().resolve(),
+            "files_root": str(Path(core.files_root).expanduser().resolve()),
             "gapi": "1.0",
             "parameters": parameters,
             "vlnv": vlnv_str,
@@ -528,7 +528,7 @@ class Ttptttg:
         Launcher(args[0], args[1:], cwd=generator_cwd).run()
 
         cores = []
-        logger.debug("Looking for generated cores in " + generator_cwd)
+        logger.debug("Looking for generated cores in " + str(generator_cwd))
         for root, dirs, files in os.walk(generator_cwd):
             root = Path(root)
             for f in files:

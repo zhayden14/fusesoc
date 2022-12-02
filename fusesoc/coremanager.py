@@ -248,7 +248,7 @@ class CoreManager:
                             continue
 
                         core = Core(
-                            core_file,
+                            str(core_file),
                             self.config.cache_root,
                         )
                         found_cores.append(core)
