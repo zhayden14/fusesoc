@@ -68,7 +68,7 @@ def test_library_add(caplog):
         tcf = Path(tcd) / "fusesoc.conf"
         clone_target = tempfile.mkdtemp(prefix="library_add_")
         library_root = tempfile.mkdtemp(prefix="library_add_")
-        conf = Config(file=tcf)
+        conf = Config(tcf)
         conf.library_root = library_root
         cm = CoreManager(conf)
         args = Namespace()
