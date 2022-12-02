@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import tempfile
+from pathlib import Path
 
 from fusesoc import utils
 from fusesoc.coremanager import DependencyError
@@ -19,8 +20,7 @@ logger = logging.getLogger(__name__)
 class FileAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         path = os.path.expandvars(values[0])
-        path = os.path.expanduser(path)
-        path = os.path.abspath(path)
+        path = Path(path).expanduser().resolve()
         setattr(namespace, self.dest, [path])
 
 
@@ -50,8 +50,11 @@ class Edalizer:
         self.toplevel = toplevel
         self.flags = flags
         self.core_manager = core_manager
-        self.work_root = work_root
-        self.export_root = export_root
+        self.work_root = Path(work_root)
+        if export_root is not None:
+            self.export_root = Path(export_root)
+        else:
+            self.export_root = None
         self.system_name = system_name
 
         self.generators = {}
@@ -165,12 +168,12 @@ class Edalizer:
 
             # Extract files
             if self.export_root:
-                files_root = os.path.join(self.export_root, core.sanitized_name)
+                files_root = self.export_root / core.sanitized_name
                 core.export(files_root, _flags)
             else:
                 files_root = core.files_root
 
-            rel_root = os.path.relpath(files_root, self.work_root)
+            rel_root = files_root / self.work_root
 
             # Extract parameters
             snippet["parameters"] = core.get_parameters(_flags, parameters)
@@ -193,25 +196,25 @@ class Edalizer:
                 _f = file
                 if file.get("copyto"):
                     _name = file["copyto"]
-                    dst = os.path.join(self.work_root, _name)
-                    _dstdir = os.path.dirname(dst)
-                    if not os.path.exists(_dstdir):
-                        os.makedirs(_dstdir)
+                    dst = self.work_root / _name
+                    _dstdir = dst.expanduser().resolve().parent
+                    if not _dstdir.exists():
+                        _dstdir.mkdir()
                     try:
-                        shutil.copy2(os.path.join(files_root, file["name"]), dst)
+                        shutil.copy2(files_root / file["name"], dst)
                     except IsADirectoryError:
                         shutil.copytree(
-                            os.path.join(files_root, file["name"]),
+                            files_root / file["name"],
                             dst,
                             dirs_exist_ok=True,
                         )
                     del _f["copyto"]
                 else:
-                    _name = os.path.join(rel_root, file["name"])
+                    _name = rel_root / file["name"]
                 _f["name"] = str(_name)
                 _f["core"] = str(core.name)
                 if file.get("include_path"):
-                    _f["include_path"] = os.path.join(rel_root, file["include_path"])
+                    _f["include_path"] = rel_root / file["include_path"]
 
                 _files.append(_f)
 
@@ -223,12 +226,8 @@ class Edalizer:
                 snippet["vpi"].append(
                     {
                         "name": _vpi["name"],
-                        "src_files": [
-                            os.path.join(rel_root, f) for f in _vpi["src_files"]
-                        ],
-                        "include_dirs": [
-                            os.path.join(rel_root, i) for i in _vpi["include_dirs"]
-                        ],
+                        "src_files": [rel_root / f for f in _vpi["src_files"]],
+                        "include_dirs": [rel_root / i for i in _vpi["include_dirs"]],
                         "libs": _vpi["libs"],
                     }
                 )
@@ -498,7 +497,7 @@ class Ttptttg:
         self.vlnv = Vlnv(vlnv_str)
 
         self.generator_input = {
-            "files_root": os.path.abspath(core.files_root),
+            "files_root": Path(core.files_root).expanduser().resolve(),
             "gapi": "1.0",
             "parameters": parameters,
             "vlnv": vlnv_str,
@@ -510,15 +509,15 @@ class Ttptttg:
         Returns:
             list: Cores created by the generator
         """
-        generator_cwd = os.path.join(tempfile.mkdtemp(prefix=self.vlnv.sanitized_name))
-        generator_input_file = os.path.join(generator_cwd, self.name + "_input.yml")
+        generator_cwd = Path(tempfile.mkdtemp(prefix=self.vlnv.sanitized_name))
+        generator_input_file = generator_cwd / (self.name + "_input.yml")
 
         logger.info("Generating " + str(self.vlnv))
         utils.yaml_fwrite(generator_input_file, self.generator_input)
 
         args = [
-            os.path.join(os.path.abspath(self.generator.root), self.generator.command),
-            os.path.abspath(generator_input_file),
+            Path(self.generator.root).expanduser().resolve() / self.generator.command,
+            Path(generator_input_file).expanduser().resolve(),
         ]
 
         if self.generator.interpreter:
@@ -529,10 +528,11 @@ class Ttptttg:
         cores = []
         logger.debug("Looking for generated cores in " + generator_cwd)
         for root, dirs, files in os.walk(generator_cwd):
+            root = Path(root)
             for f in files:
                 if f.endswith(".core"):
                     try:
-                        cores.append(Core(os.path.join(root, f), generated=True))
+                        cores.append(Core(root / f, generated=True))
                     except SyntaxError as e:
                         w = "Failed to parse generated core file " + f + ": " + e.msg
                         raise RuntimeError(w)

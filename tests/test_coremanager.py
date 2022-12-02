@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 
+# FIXME: fails on windows if FuseSoC is on a different drive from temp folder location
 def test_deptree(tmp_path):
     import os
 
@@ -120,6 +121,7 @@ def test_deptree(tmp_path):
     assert edalized_filenames == expected_filenames
 
 
+# FIXME: fails on windows if FuseSoC is on a different drive from temp folder location
 def test_copyto():
     import os
     import tempfile
@@ -217,6 +219,7 @@ def test_export():
         assert (export_root / f).is_file()
 
 
+# FIXME: fails on windows if FuseSoC is on a different drive from temp folder location
 def test_virtual():
     import os
     import tempfile
