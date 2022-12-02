@@ -4,6 +4,7 @@
 
 import logging
 import os
+from pathlib import Path
 
 from okonomiyaki.versions import EnpkgVersion
 from simplesat.constraints import PrettyPackageStringParser, Requirement
@@ -211,14 +212,15 @@ class CoreManager:
 
     def find_cores(self, library, ignored_dirs):
         found_cores = []
-        path = os.path.expanduser(library.location)
+        path = Path(library.location).expanduser().resolve()
         exclude = {".git"}
-        if os.path.isdir(path) == False:
+        if path.is_dir() == False:
             raise OSError(path + " is not a directory")
-        logger.debug("Checking for cores in " + path)
+        logger.debug("Checking for cores in " + str(path))
         for root, dirs, files in os.walk(path, followlinks=True):
+            root = Path(root)
             ignore_tree = ("FUSESOC_IGNORE" in files) or (
-                os.path.abspath(root) in ignored_dirs
+                Path(root).expanduser().resolve() in ignored_dirs
             )
             if ignore_tree:
                 del dirs[:]
@@ -226,8 +228,10 @@ class CoreManager:
 
             dirs[:] = [directory for directory in dirs if directory not in exclude]
             for f in files:
-                if f.endswith(".core"):
-                    core_file = os.path.join(root, f)
+                f = Path(f)
+                if f.suffix == ".core":
+                    core_file = root / f
+                    core_file = core_file.resolve()
                     try:
                         capi_version = self._detect_capi_version(core_file)
                         if capi_version == 1:
@@ -249,11 +253,16 @@ class CoreManager:
                         )
                         found_cores.append(core)
                     except SyntaxError as e:
-                        w = "Parse error. Ignoring file " + core_file + ": " + e.msg
+                        w = (
+                            "Parse error. Ignoring file "
+                            + str(core_file)
+                            + ": "
+                            + e.msg
+                        )
                         logger.warning(w)
                     except ImportError as e:
                         w = 'Failed to register "{}" due to unknown provider: {}'
-                        logger.warning(w.format(core_file, str(e)))
+                        logger.warning(w.format(str(core_file), str(e)))
                     except ValueError as e:
                         logger.warning(e)
         return found_cores
@@ -303,7 +312,7 @@ class CoreManager:
 
     def add_library(self, library, ignored_dirs):
         """Register a library"""
-        abspath = os.path.abspath(os.path.expanduser(library.location))
+        abspath = Path(library.location).expanduser().resolve()
         _library = self._lm.get_library(abspath, "location")
         if _library:
             _s = "Not adding library {} ({}). Library {} already registered for this location"

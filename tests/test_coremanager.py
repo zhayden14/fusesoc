@@ -2,6 +2,8 @@
 # Licensed under the 2-Clause BSD License, see LICENSE for details.
 # SPDX-License-Identifier: BSD-2-Clause
 
+from pathlib import Path
+
 import pytest
 
 
@@ -16,8 +18,8 @@ def test_deptree(tmp_path):
 
     flags = {"tool": "icarus"}
 
-    tests_dir = os.path.dirname(__file__)
-    deptree_cores_dir = os.path.join(tests_dir, "capi2_cores", "deptree")
+    tests_dir = Path(__file__).resolve().parent
+    deptree_cores_dir = tests_dir / "capi2_cores" / "deptree"
     lib = Library("deptree", deptree_cores_dir)
 
     cm = CoreManager(Config())
@@ -75,12 +77,13 @@ def test_deptree(tmp_path):
 
     # Use Edalizer to get the files.
     # This is necessary because we need to run generators.
-    work_root = str(tmp_path / "work")
-    os.mkdir(work_root)
+    tmp_path = Path(tmp_path).expanduser().resolve()
+    work_root = tmp_path / "work"
+    work_root.mkdir(parents=True)
     edalizer = Edalizer(
         toplevel=root_core.name,
         flags=flags,
-        work_root=work_root,
+        work_root=str(work_root),
         core_manager=cm,
     )
     edam = edalizer.run()
@@ -131,7 +134,8 @@ def test_copyto():
 
     work_root = tempfile.mkdtemp(prefix="copyto_")
 
-    core_dir = os.path.join(os.path.dirname(__file__), "cores", "misc", "copytocore")
+    this_dir = Path(__file__).resolve().parent
+    core_dir = this_dir / "cores" / "misc" / "copytocore"
     lib = Library("misc", core_dir)
 
     cm = CoreManager(Config())
@@ -143,7 +147,7 @@ def test_copyto():
         toplevel=core.name,
         flags=flags,
         core_manager=cm,
-        work_root=work_root,
+        work_root=str(work_root),
         export_root=None,
         system_name=None,
     )
@@ -161,8 +165,8 @@ def test_copyto():
             "name": "subdir/another.file",
         },
     ]
-    assert os.path.exists(os.path.join(work_root, "copied.file"))
-    assert os.path.exists(os.path.join(work_root, "subdir", "another.file"))
+    assert (Path(work_root) / "copied.file").exists()
+    assert (Path(work_root) / "subdir" / "another.file").exists()
 
 
 def test_export():
@@ -177,11 +181,12 @@ def test_export():
 
     flags = {"tool": "icarus"}
 
-    build_root = tempfile.mkdtemp(prefix="export_")
-    export_root = os.path.join(build_root, "exported_files")
-    work_root = os.path.join(build_root, "work")
+    build_root = Path(tempfile.mkdtemp(prefix="export_"))
+    export_root = build_root / "exported_files"
+    work_root = build_root / "work"
 
-    core_dir = os.path.join(os.path.dirname(__file__), "cores")
+    this_dir = Path(__file__).resolve().parent
+    core_dir = this_dir / "cores"
 
     cm = CoreManager(Config())
     cm.add_library(Library("cores", core_dir), [])
@@ -192,8 +197,8 @@ def test_export():
         toplevel=core.name,
         flags=flags,
         core_manager=cm,
-        work_root=work_root,
-        export_root=export_root,
+        work_root=str(work_root),
+        export_root=str(export_root),
         system_name=None,
     )
     edalizer.run()
@@ -209,7 +214,7 @@ def test_export():
         "wb_intercon_1.0/rtl/verilog/wb_arbiter.v",
         "wb_intercon_1.0/rtl/verilog/wb_upsizer.v",
     ]:
-        assert os.path.isfile(os.path.join(export_root, f))
+        assert (export_root / f).is_file()
 
 
 def test_virtual():
@@ -224,10 +229,11 @@ def test_virtual():
 
     flags = {"tool": "icarus"}
 
-    build_root = tempfile.mkdtemp(prefix="export_")
-    work_root = os.path.join(build_root, "work")
+    build_root = Path(tempfile.mkdtemp(prefix="export_"))
+    work_root = build_root / "work"
 
-    core_dir = os.path.join(os.path.dirname(__file__), "capi2_cores", "virtual")
+    this_dir = Path(__file__).resolve().parent
+    core_dir = this_dir / "capi2_cores" / "virtual"
 
     cm = CoreManager(Config())
     cm.add_library(Library("virtual", core_dir), [])
@@ -238,7 +244,7 @@ def test_virtual():
         toplevel=root_core.name,
         flags=flags,
         core_manager=cm,
-        work_root=work_root,
+        work_root=str(work_root),
     )
     edalizer.run()
 
