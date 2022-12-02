@@ -46,7 +46,8 @@ def test_config():
 
 def test_config_relative_path():
     with tempfile.TemporaryDirectory() as td:
-        config_path = os.path.join(td, "fusesoc.conf")
+        config_path = Path(td) / "fusesoc.conf"
+        config_path = config_path.expanduser().resolve()
         with open(config_path, "w") as tcf:
             tcf.write(
                 EXAMPLE_CONFIG.format(
@@ -57,7 +58,7 @@ def test_config_relative_path():
                 )
             )
 
-            conf = Config(tcf.name)
+        conf = Config(config_path)
         for name in ["build_root", "cache_root", "library_root"]:
             abs_td = Path(td).expanduser().resolve()
             assert getattr(conf, name) == abs_td / name
