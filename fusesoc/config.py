@@ -114,7 +114,7 @@ class Config:
         if expanded.is_absolute():
             return expanded
         else:
-            cfg_file_dir = self._path.parent
+            cfg_file_dir = Path(self._path).parent
             return cfg_file_dir / expanded
 
     def _path_from_cfg(self, config, name):

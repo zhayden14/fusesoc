@@ -27,7 +27,7 @@ sync-uri = https://github.com/fusesoc/fusesoc-cores
 """
 
 
-def test_config_file():
+def test_config():
     tcd = tempfile.TemporaryDirectory()
     tcf = Path(tcd.name) / "fusesoc.conf"
     tcf.write_text(
@@ -39,28 +39,9 @@ def test_config_file():
         )
     )
 
-    conf = Config(file=tcf)
+    conf = Config(tcf)
 
-    assert conf.build_root == Path(build_root)
-
-
-def test_config_path():
-    tcd = tempfile.TemporaryDirectory()
-    tcf = Path(tcd.name) / "fusesoc.conf"
-    tcf.write_text(
-        EXAMPLE_CONFIG.format(
-            build_root=build_root,
-            cache_root=cache_root,
-            cores_root=cores_root,
-            library_root=library_root,
-        )
-    )
-    tcf.seek(0)
-
-    conf = Config(tcf.name)
-    for name in ["build_root", "cache_root", "library_root"]:
-        abs_td = os.path.abspath(td)
-        assert getattr(conf, name) == os.path.join(abs_td, name)
+    assert conf.library_root == Path(library_root).expanduser().resolve()
 
 
 def test_config_relative_path():
@@ -76,10 +57,10 @@ def test_config_relative_path():
                 )
             )
 
-        conf = Config(tcf.name)
+            conf = Config(tcf.name)
         for name in ["build_root", "cache_root", "library_root"]:
-            abs_td = os.path.abspath(td)
-            assert getattr(conf, name) == os.path.join(abs_td, name)
+            abs_td = Path(td).expanduser().resolve()
+            assert getattr(conf, name) == abs_td / name
 
 
 def test_config_libraries():
@@ -94,7 +75,7 @@ def test_config_libraries():
         )
     )
 
-    conf = Config(path=tcf)
+    conf = Config(tcf)
 
     lib = None
     for library in conf.libraries:
