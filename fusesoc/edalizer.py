@@ -214,7 +214,7 @@ class Edalizer:
                 _f["name"] = str(_name)
                 _f["core"] = str(core.name)
                 if file.get("include_path"):
-                    _f["include_path"] = rel_root / file["include_path"]
+                    _f["include_path"] = str(rel_root / file["include_path"])
 
                 _files.append(_f)
 
@@ -226,8 +226,10 @@ class Edalizer:
                 snippet["vpi"].append(
                     {
                         "name": _vpi["name"],
-                        "src_files": [rel_root / f for f in _vpi["src_files"]],
-                        "include_dirs": [rel_root / i for i in _vpi["include_dirs"]],
+                        "src_files": [str(rel_root / f) for f in _vpi["src_files"]],
+                        "include_dirs": [
+                            str(rel_root / i) for i in _vpi["include_dirs"]
+                        ],
                         "libs": _vpi["libs"],
                     }
                 )
