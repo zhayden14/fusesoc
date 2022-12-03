@@ -35,21 +35,24 @@ sync_uri = "https://github.com/fusesoc/fusesoc-cores"
 def test_library_location():
     from fusesoc.main import _get_core, init_coremanager
 
-    with tempfile.NamedTemporaryFile(mode="w+") as tcf:
-        tcf.write(
-            EXAMPLE_CONFIG.format(
-                build_root=build_root,
-                cache_root=cache_root,
-                cores_root=cores_root,
-                library_root=library_root,
-                auto_sync="false",
-                sync_uri=sync_uri,
-                sync_type="git",
+    with tempfile.TemporaryDirectory() as td:
+        config_path = Path(td) / "fusesoc.conf"
+        config_path = config_path.expanduser().resolve()
+        with open(config_path, "w") as tcf:
+            tcf.write(
+                EXAMPLE_CONFIG.format(
+                    build_root=build_root,
+                    cache_root=cache_root,
+                    cores_root=cores_root,
+                    library_root=library_root,
+                    auto_sync="false",
+                    sync_uri=sync_uri,
+                    sync_type="git",
+                )
             )
-        )
-        tcf.flush()
+            tcf.flush()
 
-        conf = Config(tcf.name)
+        conf = Config(config_path)
 
     cm = init_coremanager(conf, [])
 
@@ -137,7 +140,7 @@ auto-sync = true"""
 def test_library_update(caplog):
     from fusesoc.main import init_coremanager, init_logging, update
 
-    clone_target = Path(tempfile.mkdtemp())
+    clone_target = tempfile.mkdtemp()
 
     subprocess.call(["git", "clone", sync_uri, clone_target])
 
