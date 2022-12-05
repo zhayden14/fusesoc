@@ -215,7 +215,7 @@ class CoreManager:
         path = Path(library.location).expanduser().resolve()
         exclude = {".git"}
         if path.is_dir() == False:
-            raise OSError(path + " is not a directory")
+            raise OSError(str(path) + " is not a directory")
         logger.debug("Checking for cores in " + str(path))
         for root, dirs, files in os.walk(path, followlinks=True):
             root = Path(root)
